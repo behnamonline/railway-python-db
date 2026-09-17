@@ -6,8 +6,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 app = FastAPI()
 
-# --- تنظیمات دیتابیس (روی Volume در /myfiles) ---
-DB_DIR = "/myfiles"
+# --- تنظیمات دیتابیس (بررسی و ساخت پوشه /myfiles) ---
+DB_DIR = "/myfiles" if os.path.exists("/myfiles") else "."
 if DB_DIR == "/myfiles":
     os.makedirs(DB_DIR, exist_ok=True)
 
@@ -68,185 +68,6 @@ def send_telegram_request(method: str, payload: dict):
         print(f"Error sending request to Telegram: {e}")
         return None
 
-# --- قالب HTML همراه با Tailwind CSS (Dark Mode) ---
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="fa" dir="rtl" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مدیریت ربات تلگرام</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-      }
-    </script>
-</head>
-<body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8 pb-32 font-sans">
-    <div class="max-w-3xl mx-auto bg-gray-800 rounded-xl shadow-2xl p-6 border border-gray-700">
-        
-        <!-- بخش تنظیمات ربات -->
-        <h2 class="text-xl font-bold mb-4 text-blue-400 border-b border-gray-700 pb-2">تنظیمات ربات</h2>
-        
-        {% if msg %}
-        <div class="mb-4 p-3 bg-blue-900/50 border border-blue-500 rounded-lg text-blue-200 text-sm">
-            {{ msg }}
-        </div>
-        {% endif %}
-
-        <form action="/set-webhook" method="post" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">توکن ربات تلگرام</label>
-                <input type="text" name="bot_token" value="{{ bot_token }}" dir="ltr" placeholder="123456789:ABCdef..." required
-                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-left">
-            </div>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
-                ست کردن وبهوک
-            </button>
-        </form>
-
-        <hr class="my-8 border-gray-700">
-
-        <!-- بخش مدیریت محصولات (CRUD) -->
-        <h2 class="text-xl font-bold mb-4 text-blue-400 border-b border-gray-700 pb-2">مدیریت محصولات</h2>
-        
-        <!-- فرم افزودن / ویرایش محصول -->
-        <form action="{{ form_action }}" method="post" class="space-y-4 mb-8 bg-gray-850 p-4 rounded-lg border border-gray-700/50">
-            <h3 class="text-md font-semibold text-gray-200 mb-2">{{ form_title }}</h3>
-            <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1">عنوان (Title)</label>
-                <input type="text" name="title" value="{{ edit_title }}" required placeholder="مثال: اکانت پرمیوم"
-                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1">قیمت (Price)</label>
-                <input type="text" name="price" value="{{ edit_price }}" required placeholder="مثال: ۱۰۰,۰۰۰ تومان"
-                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1">توضیحات محصول (Product)</label>
-                <textarea name="product" rows="2" required placeholder="توضیحات مربوط به محصول..."
-                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">{{ edit_product }}</textarea>
-            </div>
-            <div class="flex gap-2">
-                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
-                    {{ submit_btn_text }}
-                </button>
-                {% if is_editing %}
-                <a href="/" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 inline-block">
-                    انصراف
-                </a>
-                {% endif %}
-            </div>
-        </form>
-
-        <!-- لیست محصولات -->
-        <div class="overflow-x-auto">
-            <table class="w-full text-right text-sm text-gray-300">
-                <thead class="bg-gray-700 text-gray-200 uppercase text-xs">
-                    <tr>
-                        <th class="p-3">ID</th>
-                        <th class="p-3">عنوان</th>
-                        <th class="p-3">قیمت</th>
-                        <th class="p-3">توضیحات</th>
-                        <th class="p-3 text-center">عملیات</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-700">
-                    {% for p in products %}
-                    <tr class="hover:bg-gray-750">
-                        <td class="p-3">{{ p.id }}</td>
-                        <td class="p-3 font-medium text-white">{{ p.title }}</td>
-                        <td class="p-3">{{ p.price }}</td>
-                        <td class="p-3 truncate max-w-xs">{{ p.product }}</td>
-                        <td class="p-3 text-center flex justify-center gap-2">
-                            <a href="/?edit={{ p.id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs py-1 px-3 rounded transition duration-200">
-                                ویرایش
-                            </a>
-                            <form action="/product/delete/{{ p.id }}" method="post" onsubmit="return confirm('آیا از حذف مطمئن هستید؟')">
-                                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-3 rounded transition duration-200">
-                                    حذف
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="5" class="p-4 text-center text-gray-500">هیچ محصولی ثبت نشده است.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-    </div>
-</body>
-</html>
-"""
-
-def render_html(products, bot_token="", msg="", edit_item=None):
-    html = HTML_TEMPLATE
-    html = html.replace("{{ bot_token }}", bot_token)
-    
-    # تنظیم متغیرهای فرم ویرایش/افزودن
-    if edit_item:
-        html = html.replace("{{ form_action }}", f"/product/edit/{edit_item['id']}")
-        html = html.replace("{{ form_title }}", "ویرایش محصول")
-        html = html.replace("{{ edit_title }}", edit_item['title'])
-        html = html.replace("{{ edit_price }}", edit_item['price'])
-        html = html.replace("{{ edit_product }}", edit_item['product'])
-        html = html.replace("{{ submit_btn_text }}", "به‌روزرسانی محصول")
-        html = html.replace("{% if is_editing %}", "").replace("{% endif %}", "")
-    else:
-        html = html.replace("{{ form_action }}", "/product/add")
-        html = html.replace("{{ form_title }}", "افزودن محصول جدید")
-        html = html.replace("{{ edit_title }}", "")
-        html = html.replace("{{ edit_price }}", "")
-        html = html.replace("{{ edit_product }}", "")
-        html = html.replace("{{ submit_btn_text }}", "ذخیره محصول")
-        # حذف دکمه انصراف در حالت غیر ویرایش
-        start_edit = html.find("{% if is_editing %}")
-        end_edit = html.find("{% endif %}") + len("{% endif %}")
-        if start_edit != -1:
-            html = html[:start_edit] + html[end_edit:]
-
-    msg_block = f'<div class="mb-4 p-3 bg-blue-900/50 border border-blue-500 rounded-lg text-blue-200 text-sm">{msg}</div>' if msg else ''
-    if "{% if msg %}" in html:
-        start = html.find("{% if msg %}")
-        end = html.find("{% endif %}") + len("{% endif %}")
-        html = html[:start] + msg_block + html[end:]
-
-    rows = ""
-    if products:
-        for p in products:
-            rows += f"""
-            <tr class="hover:bg-gray-750 border-b border-gray-700">
-                <td class="p-3">{p['id']}</td>
-                <td class="p-3 font-medium text-white">{p['title']}</td>
-                <td class="p-3">{p['price']}</td>
-                <td class="p-3 truncate max-w-xs">{p['product']}</td>
-                <td class="p-3 text-center flex justify-center gap-2">
-                    <a href="/?edit={p['id']}" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs py-1 px-3 rounded transition duration-200">
-                        ویرایش
-                    </a>
-                    <form action="/product/delete/{p['id']}" method="post" onsubmit="return confirm('آیا از حذف مطمئن هستید؟')">
-                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-3 rounded transition duration-200">
-                            حذف
-                        </button>
-                    </form>
-                </td>
-            </tr>
-            """
-    else:
-        rows = '<tr><td colspan="5" class="p-4 text-center text-gray-500">هیچ محصولی ثبت نشده است.</td></tr>'
-
-    start_loop = html.find("{% for p in products %}")
-    end_loop = html.find("{% endfor %}") + len("{% endfor %}")
-    html = html[:start_loop] + rows + html[end_loop:]
-
-    return html
-
 # --- مسیرهای وب ---
 
 @app.get("/", response_class=HTMLResponse)
@@ -265,7 +86,139 @@ def index(msg: str = "", edit: int = None):
     
     bot_token = get_setting("bot_token")
     
-    return render_html(products, bot_token, msg, edit_item)
+    # مقادیر پیش‌فرض فرم (در حالت افزودن)
+    form_action = "/product/add"
+    form_title = "افزودن محصول جدید"
+    btn_text = "ذخیره محصول"
+    edit_id = ""
+    title_val = ""
+    price_val = ""
+    product_val = ""
+    cancel_btn = ""
+
+    # مقادیر فرم در صورت ویرایش
+    if edit_item:
+        form_action = f"/product/edit/{edit_item['id']}"
+        form_title = "ویرایش محصول"
+        btn_text = "بروزرسانی محصول"
+        edit_id = edit_item["id"]
+        title_val = edit_item["title"]
+        price_val = edit_item["price"]
+        product_val = edit_item["product"]
+        cancel_btn = '<a href="/" class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg text-sm inline-block mr-2">انصراف</a>'
+
+    # پیام سیستم
+    msg_html = f'<div class="mb-4 p-3 bg-blue-900/50 border border-blue-500 rounded-lg text-blue-200 text-sm">{msg}</div>' if msg else ''
+
+    # رندر لیست محصولات
+    product_rows = ""
+    for p in products:
+        product_rows += f"""
+        <tr class="hover:bg-gray-750 border-b border-gray-700">
+            <td class="p-3 text-center">{p['id']}</td>
+            <td class="p-3 font-medium text-white">{p['title']}</td>
+            <td class="p-3">{p['price']}</td>
+            <td class="p-3">{p['product']}</td>
+            <td class="p-3 text-center">
+                <div class="flex justify-center gap-2">
+                    <a href="/?edit={p['id']}" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs py-1 px-3 rounded">ویرایش</a>
+                    <form action="/product/delete/{p['id']}" method="post" onsubmit="return confirm('آیا از حذف این محصول اطمینان دارید؟')">
+                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-3 rounded">حذف</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        """
+
+    if not products:
+        product_rows = '<tr><td colspan="5" class="p-4 text-center text-gray-500">هیچ محصولی یافت نشد.</td></tr>'
+
+    # قالب کامل HTML با پدینگ مناسب در body (pb-32)
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="fa" dir="rtl" class="dark">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>مدیریت ربات تلگرام</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+          tailwind.config = {{
+            darkMode: 'class',
+          }}
+        </script>
+    </head>
+    <body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8 pb-32 font-sans">
+        <div class="max-w-3xl mx-auto bg-gray-800 rounded-xl shadow-2xl p-6 border border-gray-700">
+            
+            <!-- تنظیمات ربات -->
+            <h2 class="text-xl font-bold mb-4 text-blue-400 border-b border-gray-700 pb-2">تنظیمات ربات</h2>
+            {msg_html}
+            <form action="/set-webhook" method="post" class="space-y-4 mb-8">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">توکن ربات تلگرام</label>
+                    <input type="text" name="bot_token" value="{bot_token}" dir="ltr" placeholder="123456789:ABCdef..." required
+                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-left">
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
+                    ست کردن وبهوک
+                </button>
+            </form>
+
+            <hr class="my-8 border-gray-700">
+
+            <!-- مدیریت محصولات -->
+            <h2 class="text-xl font-bold mb-4 text-blue-400 border-b border-gray-700 pb-2">مدیریت محصولات</h2>
+            
+            <!-- فرم افزودن/ویرایش -->
+            <form action="{form_action}" method="post" class="space-y-4 mb-8 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                <h3 class="text-md font-semibold text-gray-200">{form_title}</h3>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">عنوان (Title)</label>
+                    <input type="text" name="title" value="{title_val}" required placeholder="مثال: اکانت پرمیوم"
+                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">قیمت (Price)</label>
+                    <input type="text" name="price" value="{price_val}" required placeholder="مثال: ۱۰۰,۰۰۰ تومان"
+                           class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">توضیحات محصول (Product)</label>
+                    <textarea name="product" rows="3" required placeholder="توضیحات مربوط به محصول..."
+                              class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">{product_val}</textarea>
+                </div>
+                <div>
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
+                        {btn_text}
+                    </button>
+                    {cancel_btn}
+                </div>
+            </form>
+
+            <!-- جدول نمایش محصولات -->
+            <div class="overflow-x-auto rounded-lg border border-gray-700">
+                <table class="w-full text-right text-sm text-gray-300">
+                    <thead class="bg-gray-700 text-gray-200 uppercase text-xs">
+                        <tr>
+                            <th class="p-3 text-center">ID</th>
+                            <th class="p-3">عنوان</th>
+                            <th class="p-3">قیمت</th>
+                            <th class="p-3">توضیحات</th>
+                            <th class="p-3 text-center">عملیات</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-700 bg-gray-800">
+                        {product_rows}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
 
 @app.post("/set-webhook")
 def set_webhook(request: Request, bot_token: str = Form(...)):
