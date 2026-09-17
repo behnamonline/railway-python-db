@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 app = FastAPI()
 
 # --- تنظیمات دیتابیس (فقط با وجود Volume کار می‌کند) ---
-DB_DIR = "/dbfiles-db1"
+DB_DIR = "/myfiles"
 
 if not os.path.exists(DB_DIR):
     raise RuntimeError(
