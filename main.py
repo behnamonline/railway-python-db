@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 app = FastAPI()
 
-# --- تنظیمات دیتابیس (روی Volume یا پوشه جاری) ---
+# --- تنظیمات دیتابیس (روی Volume در /myfiles) ---
 DB_DIR = "/myfiles"
 DB_PATH = os.path.join(DB_DIR, "app.db")
 
@@ -98,11 +98,6 @@ HTML_TEMPLATE = """
                 <input type="text" name="bot_token" value="{{ bot_token }}" dir="ltr" placeholder="123456789:ABCdef..." required
                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-left">
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">آدرس دامنه Railway</label>
-                <input type="text" name="domain" value="{{ domain }}" dir="ltr" placeholder="your-app.up.railway.app" required
-                       class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-left">
-            </div>
             <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
                 ست کردن وبهوک
             </button>
@@ -177,11 +172,9 @@ HTML_TEMPLATE = """
 </html>
 """
 
-def render_html(products, bot_token="", domain="", msg=""):
-    # رندر ساده جایگزین‌ها در HTML
+def render_html(products, bot_token="", msg=""):
     html = HTML_TEMPLATE
     html = html.replace("{{ bot_token }}", bot_token)
-    html = html.replace("{{ domain }}", domain)
     
     msg_block = f'<div class="mb-4 p-3 bg-blue-900/50 border border-blue-500 rounded-lg text-blue-200 text-sm">{msg}</div>' if msg else ''
     if "{% if msg %}" in html:
@@ -189,7 +182,6 @@ def render_html(products, bot_token="", domain="", msg=""):
         end = html.find("{% endif %}") + len("{% endif %}")
         html = html[:start] + msg_block + html[end:]
 
-    # ساخت ردیف‌های جدول
     rows = ""
     if products:
         for p in products:
@@ -228,21 +220,20 @@ def index(msg: str = ""):
     conn.close()
     
     bot_token = get_setting("bot_token")
-    domain = get_setting("domain")
     
-    return render_html(products, bot_token, domain, msg)
+    return render_html(products, bot_token, msg)
 
 @app.post("/set-webhook")
-def set_webhook(bot_token: str = Form(...), domain: str = Form(...)):
+def set_webhook(request: Request, bot_token: str = Form(...)):
     bot_token = bot_token.strip()
-    clean_domain = domain.strip().rstrip('/')
-    if not clean_domain.startswith("http"):
-        clean_domain = f"https://{clean_domain}"
-        
-    set_setting("bot_token", bot_token)
-    set_setting("domain", clean_domain)
     
-    webhook_url = f"{clean_domain}/webhook"
+    # دریافت خودکار آدرس دامنه از request
+    domain = str(request.base_url).rstrip('/')
+    
+    set_setting("bot_token", bot_token)
+    set_setting("domain", domain)
+    
+    webhook_url = f"{domain}/webhook"
     res = send_telegram_request("setWebhook", {"url": webhook_url})
     
     status_msg = "وبهوک با موفقیت ست شد." if res and res.get("ok") else f"خطا در ست کردن وبهوک: {res}"
@@ -272,7 +263,7 @@ def delete_product(product_id: int):
 async def telegram_webhook(request: Request):
     data = await request.json()
     
-    # پردازش پیام‌های دریافت شده
+    # پردازش پیام‌های متنی
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
@@ -284,7 +275,6 @@ async def telegram_webhook(request: Request):
             products = cursor.fetchall()
             conn.close()
             
-            # ساخت دکمه‌های شیشه‌ای
             keyboard = []
             for p in products:
                 keyboard.append([{"text": p["title"], "callback_data": f"prod_{p['id']}"}])
@@ -299,10 +289,14 @@ async def telegram_webhook(request: Request):
     # پردازش کلیک روی دکمه‌های شیشه‌ای
     elif "callback_query" in data:
         query = data["callback_query"]
+        query_id = query["id"]
         chat_id = query["message"]["chat"]["id"]
         callback_data = query["data"]
         
         if callback_data.startswith("prod_"):
+            # پاسخ سریع برای رفع لودینگ دکمه شیشه‌ای
+            send_telegram_request("answerCallbackQuery", {"callback_query_id": query_id})
+            
             prod_id = int(callback_data.split("_")[1])
             
             conn = get_db()
@@ -312,13 +306,13 @@ async def telegram_webhook(request: Request):
             conn.close()
             
             if p:
-                text = f"📦 *{p['title']}*\n\n💰 قیمت: {p['price']}\n\n📝 توضیحات:\n{p['product']}"
+                caption = f"📦 *{p['title']}*\n\n💰 قیمت: {p['price']}\n\n📝 توضیحات:\n{p['product']}"
                 keyboard = [
                     [{"text": "🛒 خرید", "callback_data": f"buy_{p['id']}"}]
                 ]
                 payload = {
                     "chat_id": chat_id,
-                    "text": text,
+                    "text": caption,
                     "parse_mode": "Markdown",
                     "reply_markup": {"inline_keyboard": keyboard}
                 }
@@ -326,7 +320,7 @@ async def telegram_webhook(request: Request):
                 
         elif callback_data.startswith("buy_"):
             payload = {
-                "callback_query_id": query["id"],
+                "callback_query_id": query_id,
                 "text": "به زودی ...",
                 "show_alert": True
             }
