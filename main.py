@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 app = FastAPI()
 
 # --- تنظیمات اجباری Volume ---
-DB_DIR = "/dbfiles-db1"
+DB_DIR = "/myfiles"
 
 # بررسی اجباری: اگر مسیر ولوم وجود نداشته باشد، برنامه کلاً بالا نمی‌آید و خطا می‌دهد
 if not os.path.exists(DB_DIR):
