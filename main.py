@@ -8,6 +8,9 @@ app = FastAPI()
 
 # --- تنظیمات دیتابیس (روی Volume در /myfiles) ---
 DB_DIR = "/myfiles"
+if DB_DIR == "/myfiles":
+    os.makedirs(DB_DIR, exist_ok=True)
+
 DB_PATH = os.path.join(DB_DIR, "app.db")
 
 def get_db():
@@ -80,7 +83,7 @@ HTML_TEMPLATE = """
       }
     </script>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8 font-sans">
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8 pb-32 font-sans">
     <div class="max-w-3xl mx-auto bg-gray-800 rounded-xl shadow-2xl p-6 border border-gray-700">
         
         <!-- بخش تنظیمات ربات -->
@@ -108,27 +111,34 @@ HTML_TEMPLATE = """
         <!-- بخش مدیریت محصولات (CRUD) -->
         <h2 class="text-xl font-bold mb-4 text-blue-400 border-b border-gray-700 pb-2">مدیریت محصولات</h2>
         
-        <!-- فرم افزودن محصول -->
-        <form action="/product/add" method="post" class="space-y-4 mb-8 bg-gray-850 p-4 rounded-lg border border-gray-700/50">
-            <h3 class="text-md font-semibold text-gray-200 mb-2">افزودن محصول جدید</h3>
+        <!-- فرم افزودن / ویرایش محصول -->
+        <form action="{{ form_action }}" method="post" class="space-y-4 mb-8 bg-gray-850 p-4 rounded-lg border border-gray-700/50">
+            <h3 class="text-md font-semibold text-gray-200 mb-2">{{ form_title }}</h3>
             <div>
                 <label class="block text-xs font-medium text-gray-400 mb-1">عنوان (Title)</label>
-                <input type="text" name="title" required placeholder="مثال: اکانت پرمیوم"
+                <input type="text" name="title" value="{{ edit_title }}" required placeholder="مثال: اکانت پرمیوم"
                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-400 mb-1">قیمت (Price)</label>
-                <input type="text" name="price" required placeholder="مثال: ۱۰۰,۰۰۰ تومان"
+                <input type="text" name="price" value="{{ edit_price }}" required placeholder="مثال: ۱۰۰,۰۰۰ تومان"
                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-400 mb-1">توضیحات محصول (Product)</label>
                 <textarea name="product" rows="2" required placeholder="توضیحات مربوط به محصول..."
-                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                          class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">{{ edit_product }}</textarea>
             </div>
-            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
-                ذخیره محصول
-            </button>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200">
+                    {{ submit_btn_text }}
+                </button>
+                {% if is_editing %}
+                <a href="/" class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 inline-block">
+                    انصراف
+                </a>
+                {% endif %}
+            </div>
         </form>
 
         <!-- لیست محصولات -->
@@ -150,7 +160,10 @@ HTML_TEMPLATE = """
                         <td class="p-3 font-medium text-white">{{ p.title }}</td>
                         <td class="p-3">{{ p.price }}</td>
                         <td class="p-3 truncate max-w-xs">{{ p.product }}</td>
-                        <td class="p-3 text-center">
+                        <td class="p-3 text-center flex justify-center gap-2">
+                            <a href="/?edit={{ p.id }}" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs py-1 px-3 rounded transition duration-200">
+                                ویرایش
+                            </a>
                             <form action="/product/delete/{{ p.id }}" method="post" onsubmit="return confirm('آیا از حذف مطمئن هستید؟')">
                                 <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-3 rounded transition duration-200">
                                     حذف
@@ -172,10 +185,32 @@ HTML_TEMPLATE = """
 </html>
 """
 
-def render_html(products, bot_token="", msg=""):
+def render_html(products, bot_token="", msg="", edit_item=None):
     html = HTML_TEMPLATE
     html = html.replace("{{ bot_token }}", bot_token)
     
+    # تنظیم متغیرهای فرم ویرایش/افزودن
+    if edit_item:
+        html = html.replace("{{ form_action }}", f"/product/edit/{edit_item['id']}")
+        html = html.replace("{{ form_title }}", "ویرایش محصول")
+        html = html.replace("{{ edit_title }}", edit_item['title'])
+        html = html.replace("{{ edit_price }}", edit_item['price'])
+        html = html.replace("{{ edit_product }}", edit_item['product'])
+        html = html.replace("{{ submit_btn_text }}", "به‌روزرسانی محصول")
+        html = html.replace("{% if is_editing %}", "").replace("{% endif %}", "")
+    else:
+        html = html.replace("{{ form_action }}", "/product/add")
+        html = html.replace("{{ form_title }}", "افزودن محصول جدید")
+        html = html.replace("{{ edit_title }}", "")
+        html = html.replace("{{ edit_price }}", "")
+        html = html.replace("{{ edit_product }}", "")
+        html = html.replace("{{ submit_btn_text }}", "ذخیره محصول")
+        # حذف دکمه انصراف در حالت غیر ویرایش
+        start_edit = html.find("{% if is_editing %}")
+        end_edit = html.find("{% endif %}") + len("{% endif %}")
+        if start_edit != -1:
+            html = html[:start_edit] + html[end_edit:]
+
     msg_block = f'<div class="mb-4 p-3 bg-blue-900/50 border border-blue-500 rounded-lg text-blue-200 text-sm">{msg}</div>' if msg else ''
     if "{% if msg %}" in html:
         start = html.find("{% if msg %}")
@@ -191,7 +226,10 @@ def render_html(products, bot_token="", msg=""):
                 <td class="p-3 font-medium text-white">{p['title']}</td>
                 <td class="p-3">{p['price']}</td>
                 <td class="p-3 truncate max-w-xs">{p['product']}</td>
-                <td class="p-3 text-center">
+                <td class="p-3 text-center flex justify-center gap-2">
+                    <a href="/?edit={p['id']}" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs py-1 px-3 rounded transition duration-200">
+                        ویرایش
+                    </a>
                     <form action="/product/delete/{p['id']}" method="post" onsubmit="return confirm('آیا از حذف مطمئن هستید؟')">
                         <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-xs py-1 px-3 rounded transition duration-200">
                             حذف
@@ -212,26 +250,29 @@ def render_html(products, bot_token="", msg=""):
 # --- مسیرهای وب ---
 
 @app.get("/", response_class=HTMLResponse)
-def index(msg: str = ""):
+def index(msg: str = "", edit: int = None):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM products ORDER BY id DESC")
     products = cursor.fetchall()
+    
+    edit_item = None
+    if edit:
+        cursor.execute("SELECT * FROM products WHERE id = ?", (edit,))
+        edit_item = cursor.fetchone()
+        
     conn.close()
     
     bot_token = get_setting("bot_token")
     
-    return render_html(products, bot_token, msg)
+    return render_html(products, bot_token, msg, edit_item)
 
 @app.post("/set-webhook")
 def set_webhook(request: Request, bot_token: str = Form(...)):
     bot_token = bot_token.strip()
     
-    # استخراج دامنه و اطمینان از HTTPS بودن پروتکل
     scheme = request.headers.get("x-forwarded-proto", "https")
     host = request.headers.get("host", request.base_url.netloc)
-    
-    # اجبار استفاده از HTTPS برای وبهوک تلگرام
     domain = f"https://{host}"
     
     set_setting("bot_token", bot_token)
@@ -252,6 +293,15 @@ def add_product(title: str = Form(...), price: str = Form(...), product: str = F
     conn.close()
     return RedirectResponse(url="/", status_code=303)
 
+@app.post("/product/edit/{product_id}")
+def update_product(product_id: int, title: str = Form(...), price: str = Form(...), product: str = Form(...)):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE products SET title = ?, price = ?, product = ? WHERE id = ?", (title, price, product, product_id))
+    conn.commit()
+    conn.close()
+    return RedirectResponse(url="/", status_code=303)
+
 @app.post("/product/delete/{product_id}")
 def delete_product(product_id: int):
     conn = get_db()
@@ -267,7 +317,6 @@ def delete_product(product_id: int):
 async def telegram_webhook(request: Request):
     data = await request.json()
     
-    # پردازش پیام‌های متنی
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
@@ -290,7 +339,6 @@ async def telegram_webhook(request: Request):
             }
             send_telegram_request("sendMessage", payload)
 
-    # پردازش کلیک روی دکمه‌های شیشه‌ای
     elif "callback_query" in data:
         query = data["callback_query"]
         query_id = query["id"]
@@ -298,7 +346,6 @@ async def telegram_webhook(request: Request):
         callback_data = query["data"]
         
         if callback_data.startswith("prod_"):
-            # پاسخ سریع برای رفع لودینگ دکمه شیشه‌ای
             send_telegram_request("answerCallbackQuery", {"callback_query_id": query_id})
             
             prod_id = int(callback_data.split("_")[1])
