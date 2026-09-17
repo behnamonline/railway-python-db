@@ -8,7 +8,7 @@ app = FastAPI()
 
 # --- تنظیمات دیتابیس (بررسی و ساخت پوشه /myfiles) ---
 DB_DIR = "/dbfiles"
-if DB_DIR == "/myfiles":
+if DB_DIR == "/dbfiles":
     os.makedirs(DB_DIR, exist_ok=True)
 
 DB_PATH = os.path.join(DB_DIR, "app.db")
