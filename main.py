@@ -148,7 +148,7 @@ def index(msg: str = "", edit: int = None):
           }}
         </script>
     </head>
-    <body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8 pb-32 font-sans">
+    <body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8 pb-32 font-sans" style="padding-bottom:90vh">
         <div class="max-w-3xl mx-auto bg-gray-800 rounded-xl shadow-2xl p-6 border border-gray-700">
             
             <!-- تنظیمات ربات -->
