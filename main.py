@@ -227,8 +227,12 @@ def index(msg: str = ""):
 def set_webhook(request: Request, bot_token: str = Form(...)):
     bot_token = bot_token.strip()
     
-    # دریافت خودکار آدرس دامنه از request
-    domain = str(request.base_url).rstrip('/')
+    # استخراج دامنه و اطمینان از HTTPS بودن پروتکل
+    scheme = request.headers.get("x-forwarded-proto", "https")
+    host = request.headers.get("host", request.base_url.netloc)
+    
+    # اجبار استفاده از HTTPS برای وبهوک تلگرام
+    domain = f"https://{host}"
     
     set_setting("bot_token", bot_token)
     set_setting("domain", domain)
