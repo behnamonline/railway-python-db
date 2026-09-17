@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 app = FastAPI()
 
 # --- تنظیمات دیتابیس (بررسی و ساخت پوشه /myfiles) ---
-DB_DIR = "/myfiles" if os.path.exists("/myfiles") else "."
+DB_DIR = "/myfiles"
 if DB_DIR == "/myfiles":
     os.makedirs(DB_DIR, exist_ok=True)
 
