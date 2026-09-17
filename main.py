@@ -13,7 +13,7 @@ DB_DIR = "/myfiles"
 if not os.path.exists(DB_DIR):
     raise RuntimeError(
         f"\n\n❌ ERROR: Volume path '{DB_DIR}' was not found!\n"
-        "این برنامه فقط با داشتن Volume کار می‌کند. لطفاً ابتدا Volume را به مسیر /dbfiles-db1 متصل کنید.\n"
+        "mount it\n"
     )
 
 DB_PATH = os.path.join(DB_DIR, "app.db")
